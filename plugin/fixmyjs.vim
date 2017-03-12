@@ -128,7 +128,7 @@ function! s:getCursorPosition(numberOfNonBlankCharactersFromTheStartOfFile)
         let nonBlankCount = nonBlankCount + 1
       endif
       let charIndex = charIndex + 1
-      if nonBlankCount == a:numberOfNonBlankCharactersFromTheStartOfFile 
+      if nonBlankCount == a:numberOfNonBlankCharactersFromTheStartOfFile
         "Found position!
         return {'line': lineNumber,'column': charIndex}
       end
@@ -142,7 +142,7 @@ endfunction
 
 
 function! s:getCursorAndMarksPositions()
-  let localMarks = map(range(char2nr('a'), char2nr('z'))," \"'\".nr2char(v:val) ") 
+  let localMarks = map(range(char2nr('a'), char2nr('z'))," \"'\".nr2char(v:val) ")
   let marks = ['.'] + localMarks
   let result = {}
   for positionType in marks
@@ -163,7 +163,23 @@ endfunction
 " @return {Number} If apply was success then return '0' else '1'
 function FixmyjsApplyConfig(...)
 
-  let l:filepath = s:project_root_path . "/" . g:fixmyjs_rc_filename
+  " If the user chooses to use the rc closest to current file,
+  " then g:fixmyjs_rc_filename will be looked up in each parent dir
+  " up to, but not including, the project root path.
+  if exists('g:fixmyjs_use_rc_closest_to_file') && g:fixmyjs_use_rc_closest_to_file
+    let l:current_parent_dir = expand('%:p:h')
+    let l:filepath = l:current_parent_dir . "/" . g:fixmyjs_rc_filename
+
+    while !filereadable(l:filepath) && l:current_parent_dir !=? s:project_root_path
+      l:current_parent_dir = simplify(l:current_parent_dir . '/..')
+      l:filepath = l:current_parent_dir . '/' . g:fixmyjs_rc_filename
+    endwhile
+  endif
+
+
+  if !exists(l:filepath) || !filereadable(l:filepath)
+    let l:filepath = s:project_root_path . "/" . g:fixmyjs_rc_filename
+  endif
 
   if !filereadable(l:filepath)
     let l:filepath = get(filter(copy(s:rc_paths),'filereadable(v:val)'), 0)
@@ -191,7 +207,8 @@ endfunction
 func! Fixmyjs(...)
   " If user doesn't set fixmyjs_config in
   " .vimrc then look up it in .jshintrc
-  if empty(g:fixmyjs_rc_path)
+  " If user sets that rc should be the closest to the file, then this need to be recomputed everytime
+  if empty(g:fixmyjs_rc_path) || (exists('g:fixmyjs_use_rc_closest_to_file') && g:fixmyjs_use_rc_closest_to_file))
     let l:config_file_not_exists = FixmyjsApplyConfig()
     if l:config_file_not_exists
       return 1
